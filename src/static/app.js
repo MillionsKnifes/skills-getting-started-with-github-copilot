@@ -1,10 +1,35 @@
-document.addEventListener("DOMContentLoaded", () => {
+  document.addEventListener("DOMContentLoaded", () => {
   const activitiesList = document.getElementById("activities-list");
   const activitySelect = document.getElementById("activity");
   const signupForm = document.getElementById("signup-form");
   const messageDiv = document.getElementById("message");
 
-  // small helper to avoid injecting raw HTML from the server
+  // Handle participant unregistration
+  activitiesList.addEventListener("click", async (e) => {
+    if (e.target.classList.contains("delete-btn")) {
+      const activity = e.target.dataset.activity;
+      const email = e.target.dataset.email;
+      
+      try {
+        const response = await fetch(`/activities/${encodeURIComponent(activity)}/unregister?email=${encodeURIComponent(email)}`, {
+          method: "DELETE"
+        });
+
+        if (!response.ok) {
+          const error = await response.json();
+          throw new Error(error.detail || "Failed to unregister participant");
+        }
+
+        // Refresh the activities list
+        await fetchActivities();
+        messageDiv.textContent = `Successfully unregistered ${email} from ${activity}`;
+        messageDiv.style.color = "green";
+      } catch (error) {
+        messageDiv.textContent = error.message;
+        messageDiv.style.color = "red";
+      }
+    }
+  });  // small helper to avoid injecting raw HTML from the server
   function escapeHtml(str) {
     return String(str)
       .replace(/&/g, "&amp;")
@@ -37,7 +62,10 @@ document.addEventListener("DOMContentLoaded", () => {
         const participantsHTML = participants.length
           ? `<h5>Participants (${participants.length}/${details.max_participants})</h5>
              <ul class="participants-list">
-               ${participants.map(p => `<li class="participant-item">${escapeHtml(p)}</li>`).join("")}
+               ${participants.map(p => `<li class="participant-item">
+                 <span>${escapeHtml(p)}</span>
+                 <button class="delete-btn" data-activity="${escapeHtml(name)}" data-email="${escapeHtml(p)}">×</button>
+               </li>`).join("")}
              </ul>`
           : `<p class="participant-empty">No participants yet</p>`;
 
@@ -86,6 +114,8 @@ document.addEventListener("DOMContentLoaded", () => {
         messageDiv.textContent = result.message;
         messageDiv.className = "success";
         signupForm.reset();
+        // Refresh the activities list to show the new participant
+        await fetchActivities();
       } else {
         messageDiv.textContent = result.detail || "An error occurred";
         messageDiv.className = "error";
